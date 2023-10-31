@@ -17,7 +17,7 @@
 #include <map>
 #include  <stdio.h>
 #include  <math.h>
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 using namespace llvm;
 struct SolEquStru {
   int   is_there_solution;
@@ -46,9 +46,16 @@ using ValueVector = SmallVector<Value *, 16>;
 std::map<Instruction*, int> instructionToLineNumberMap;
 std::map<Instruction*, std::pair<int, int>> arrayIdx;
 std::map<Instruction*, std::string> Arr_name;
-std::map<std::string, std::pair<SolEquStru*, std::pair<int, int>>> flow_dep;
-std::map<std::string, std::pair<SolEquStru*, std::pair<int, int>>> anti_dep;
-std::map<std::string, std::pair<SolEquStru*, std::pair<int, int>>> output_dep;
+struct ResultData {
+    std::string name;
+    SolEquStru solEquStru;
+    int state0;
+    int state1;
+    int XCoeff;
+    int YCoeff;
+    int X0;
+    int Y0;
+};
 
 struct TriStru 
 Extended_Euclid(int a ,int b)
@@ -219,6 +226,10 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
   ValueVector MemInstr;
   for (BasicBlock &BB : F) {
     if(BB.getName() == "for.body"){
+      std::vector<ResultData> flow_dep;
+      std::vector<ResultData> anti_dep;
+      std::vector<ResultData> output_dep;
+      MemInstr.clear();
       Loop *L = LI.getLoopFor(&BB);
       std::optional<Loop::LoopBounds> Bounds = L->getBounds(SE);
       ConstantInt *InitVal = dyn_cast<ConstantInt>(&Bounds->getInitialIVValue());
@@ -231,13 +242,11 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
         for (J = I, JE = MemInstr.end(); J != JE; ++J) {
           Instruction *Src = cast<Instruction>(*I);
           Instruction *Dst = cast<Instruction>(*J);
-          std::string src_Arr_name = Arr_name[Src];
-          std::string dst_Arr_name = Arr_name[Dst];
           if(isa<LoadInst>(Src) && isa<LoadInst>(Dst)){
             continue;
           }
           if(J == I)continue;
-          if(src_Arr_name != dst_Arr_name){
+          if(Arr_name[Src] != Arr_name[Dst]){
             continue;
           }
 
@@ -260,44 +269,107 @@ PreservedAnalyses HW1Pass::run(Function &F, FunctionAnalysisManager &FAM) {
           if(!f.is_there_solution){
             continue;
           }
-
-          std::pair<int, int> mapping_state = \
-            std::make_pair(instructionToLineNumberMap[Src], instructionToLineNumberMap[Dst]);
-          std::pair<SolEquStru*, std::pair<int, int>> mapping_sol = \
-            std::make_pair(&f, mapping_state);
+          if(DEBUG_MODE){
+            errs() << "src_first : " << src_first << " ,dst_first : " << dst_first << '\n';
+            errs() << "src_second : " << src_second << " ,dst_second : " << dst_second << '\n';
+          }
+          ResultData* new_dep = new ResultData;
+          new_dep->name = Arr_name[Src];
+          new_dep->solEquStru = f;
+          new_dep->state0 = instructionToLineNumberMap[Src];
+          new_dep->state1 = instructionToLineNumberMap[Dst];
+          new_dep->XCoeff = src_first;
+          new_dep->YCoeff = dst_first;
+          new_dep->X0 = src_second;
+          new_dep->Y0 = dst_second;
           // output dep
           if(isa<StoreInst>(Src) && isa<StoreInst>(Dst)){
-              output_dep[src_Arr_name] = mapping_sol;
+              output_dep.push_back(*new_dep);
           }
-          // flow dep && anti dep
-          else{
-              flow_dep[src_Arr_name] = mapping_sol;
-              anti_dep[src_Arr_name] = mapping_sol;
+          else{// flow dep && anti dep
+              flow_dep.push_back(*new_dep);
+              anti_dep.push_back(*new_dep);
+              
           }
+          
         }
       }
       //  print answer
       //  flow dep
       errs() << "====Flow Dependency====\n";
       for (auto it = flow_dep.begin(); it != flow_dep.end(); it++) {
-          SolEquStru* sol = it->second.first;
-          int state1 = it->second.second.first;
-          int state2 = it->second.second.second;
+          SolEquStru sol = it->solEquStru;
+          int state0 = it->state0;
+          int state1 = it->state1;
 
           for (int i = InitVal->getSExtValue(); i < FinalVal->getSExtValue(); i++) {
-              errs() << it->first << ":S" << state1 << " -----> S" << state2 << '\n';
-              // X = Y -> a + bi = c + dj, j = (a + bi - c) / d
-              int i0 = i;
-              int i1 = (sol->X0 + sol->XCoeffT * i - sol->Y0) / sol->XCoeffT;
-              if(i1 < FinalVal->getSExtValue())
-                errs() << "(i=" << i0 << ",i=" << i1 << ")\n";
-              else
-                break;
+              if(i * it->YCoeff + it->Y0 <= i * it->XCoeff + it->X0){
+                  // X = Y -> a + bi = c + dj, j = (a + bi - c) / d
+                  int i0 = i;
+                  int i1 = (sol.X0 + sol.XCoeffT * i - sol.Y0) / sol.YCoeffT;
+                  if(DEBUG_MODE){
+                    errs() << "sol.X0 = " << sol.X0 << " ,sol.XCoeffT = " << sol.XCoeffT \
+                    << " ,sol.Y0 = " << sol.Y0 << " ,sol.YCoeffT = " << sol.YCoeffT << '\n';
+                  }
+                  if(i1 < FinalVal->getSExtValue()){
+                      errs() << "(i=" << i0 << ",i=" << i1 << ")\n";
+                      errs() << it->name << ":S" << state0 << " -----> S" << state1 << '\n';
+                      
+                  }
+                  else
+                    break;
+              }
+              
           }
       }
       errs() << "====Anti-Dependency====\n";
-      errs() << "====Output Dependency====\n";
+      for (auto it = anti_dep.begin(); it != anti_dep.end(); it++) {
+          SolEquStru sol = it->solEquStru;
+          int state0 = it->state0;
+          int state1 = it->state1;
+          for (int i = InitVal->getSExtValue(); i < FinalVal->getSExtValue(); i++) {
+              if(i * it->YCoeff + it->Y0 > i * it->XCoeff + it->X0){
+                  // X = Y -> a + bi = c + dj, j = (a + bi - c) / d
+                  int i0 = i;
+                  int i1 = (sol.X0 + sol.XCoeffT * i - sol.Y0) / sol.YCoeffT;
+                  if(DEBUG_MODE){
+                    errs() << "sol.X0 = " << sol.X0 << " ,sol.XCoeffT = " << sol.XCoeffT \
+                    << " ,sol.Y0 = " << sol.Y0 << " ,sol.YCoeffT = " << sol.YCoeffT << '\n';
+                  }
+                  if(i1 < FinalVal->getSExtValue()){
+                    errs() << "(i=" << i0 << ",i=" << i1 << ")\n";
+                    errs() << it->name << ":S" << state1 << " --A--> S" << state0 << '\n';
+                    
+                  }
+                  else
+                    break;
+              }
+          }
+      }
       
+      errs() << "====Output Dependency====\n";
+      for (auto it = output_dep.begin(); it != output_dep.end(); it++) {
+          SolEquStru sol = it->solEquStru;
+          int state0 = it->state0;
+          int state1 = it->state1;
+          for (int i = InitVal->getSExtValue(); i < FinalVal->getSExtValue(); i++) {
+              // X = Y -> a + bi = c + dj, j = (a + bi - c) / d
+              int i0 = i;
+              int i1 = (sol.X0 + sol.XCoeffT * i - sol.Y0) / sol.YCoeffT;
+              if(DEBUG_MODE){
+                errs() << "sol.X0 = " << sol.X0 << " ,sol.XCoeffT = " << sol.XCoeffT \
+                << " ,sol.Y0 = " << sol.Y0 << " ,sol.YCoeffT = " << sol.YCoeffT << '\n';
+              }
+              if(i1 < FinalVal->getSExtValue()){
+                  errs() << "(i=" << i0 << ",i=" << i1 << ")\n";
+                  errs() << it->name << ":S" << state0 << " --O--> S" << state1 << '\n';
+                
+              }
+              else
+                break;
+              
+          }
+      }
     }
     
   }
