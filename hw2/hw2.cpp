@@ -44,7 +44,6 @@ struct DEP{
 std::map<std::string, Var_set*> all_variables;
 std::vector<TREF*> all_TREF;
 std::vector<TGEN*> all_TGEN;
-std::vector<std::string> all_LHS;
 std::map<std::string, TEQ*> TEQIV;
 std::map<std::string, std::string> TDEF;
 std::vector<std::vector<DEP*>> all_flow_dep;
@@ -134,20 +133,28 @@ void print_output(int stmt_cnt){
         
     }
     errs() << "}\n";
-    errs() << "DEP:{\n";
-    for(int i = 0; i < all_flow_dep[stmt_cnt - 1].size(); i ++){
-        errs() << "    " << all_flow_dep[stmt_cnt - 1][i]->VAR_name << ": ";
-        errs() << all_flow_dep[stmt_cnt - 1][i]->src << "--->";
-        errs() << all_flow_dep[stmt_cnt - 1][i]->dst << "\n";
+    
+    if(all_flow_dep[stmt_cnt - 1].empty() && all_out_dep[stmt_cnt - 1].empty()){
+        errs() << "DEP:{}\n";
     }
+    else{
+        errs() << "DEP:{\n";
+        for(int i = 0; i < all_flow_dep[stmt_cnt - 1].size(); i ++){
+            errs() << "    " << all_flow_dep[stmt_cnt - 1][i]->VAR_name << ": ";
+            errs() << all_flow_dep[stmt_cnt - 1][i]->src << "--->";
+            errs() << all_flow_dep[stmt_cnt - 1][i]->dst << "\n";
+        }
 
-    for(int i = 0; i < all_out_dep[stmt_cnt - 1].size(); i ++){
-        errs() << "    " << all_out_dep[stmt_cnt - 1][i]->VAR_name << ": ";
-        errs() << all_out_dep[stmt_cnt - 1][i]->src << "-O->";
-        errs() << all_out_dep[stmt_cnt - 1][i]->dst << "\n";
+        for(int i = 0; i < all_out_dep[stmt_cnt - 1].size(); i ++){
+            errs() << "    " << all_out_dep[stmt_cnt - 1][i]->VAR_name << ": ";
+            errs() << all_out_dep[stmt_cnt - 1][i]->src << "-O->";
+            errs() << all_out_dep[stmt_cnt - 1][i]->dst << "\n";
+        }
+        errs() << "}\n";
     }
     
-    errs() << "}\n";
+    
+    
     errs() << "TDEF:{";
     for (auto it = TDEF.begin(); it != TDEF.end(); ++it){
         errs() << "(" << it->first << ", " << it->second << ")";
@@ -183,6 +190,20 @@ void handling_TDEF(int stmt_cnt){
     if(!all_TGEN[stmt_cnt - 1]->element.empty()){
         for(int i = 0; i < all_TGEN[stmt_cnt - 1]->element.size(); i ++){
             TDEF[all_TGEN[stmt_cnt - 1]->element[i]] = "S" + std::to_string(stmt_cnt);
+        }
+    }
+}
+void update_TREF(int stmt_cnt){
+    if(!all_TREF[stmt_cnt - 1]->element.empty()){
+        for(int i = 0; i < all_TREF[stmt_cnt - 1]->element.size(); i ++){
+            if(TEQIV.find(all_TREF[stmt_cnt - 1]->element[i]) != TEQIV.end()){
+                if(std::find(all_TREF[stmt_cnt - 1]->element.begin(), \
+                    all_TREF[stmt_cnt - 1]->element.end(), \
+                    TEQIV[all_TREF[stmt_cnt - 1]->element[i]]->elem2) == all_TREF[stmt_cnt - 1]->element.end()){
+                    all_TREF[stmt_cnt - 1]->element.push_back(TEQIV[all_TREF[stmt_cnt - 1]->element[i]]->elem2);
+                }
+            }
+            
         }
     }
 }
@@ -240,11 +261,17 @@ void handling_TREF(StoreInst* SI, int stmt_cnt){
             ref_name += "*";
             gen_name += "*";
         }
+        
         ref_name += LHS_name;
         gen_name += LHS_name;
         
         new_TREF->element.push_back(ref_name);
         new_TGEN->element.push_back(gen_name);
+        if(level_of_deref == 2){
+            ref_name = "";
+            ref_name += LHS_name;
+            new_TREF->element.push_back(ref_name);
+        }
     }
     else if(isa<AllocaInst>(storeLocation)){
         LHS_name = std::string(dyn_cast<AllocaInst>(storeLocation)->getName());
@@ -253,7 +280,7 @@ void handling_TREF(StoreInst* SI, int stmt_cnt){
     }
     all_TREF.push_back(new_TREF);
     all_TGEN.push_back(new_TGEN);
-
+    update_TREF(stmt_cnt);
     if(storeLocation->getType()->isPointerTy() && valueToBeStored->getType()->isPointerTy() && \
         (level_of_deref < all_variables[LHS_name]->level_of_pointer)){
         int cnt = level_of_deref + 1;
@@ -295,7 +322,7 @@ void handling_TREF(StoreInst* SI, int stmt_cnt){
             errs() << "\n";
         }
     }
-    all_LHS.push_back(LHS_name);
+    
     return;
 }
 void handling_dependency(int stmt_cnt){
