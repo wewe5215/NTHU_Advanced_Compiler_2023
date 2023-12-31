@@ -170,19 +170,19 @@ void print_output(int stmt_cnt){
             errs() << ", ";
         }
     }
-    errs() << "}\n";
+    errs() << "}\n\n";
 }
 void handling_TGEN(int stmt_cnt){
     if(!all_TGEN[stmt_cnt - 1]->element.empty()){
-        for(int i = 0; i < all_TGEN[stmt_cnt - 1]->element.size(); i ++){
-            if(TEQIV.find(all_TGEN[stmt_cnt - 1]->element[i]) != TEQIV.end()){
-                if(std::find(all_TGEN[stmt_cnt - 1]->element.begin(), \
-                    all_TGEN[stmt_cnt - 1]->element.end(), \
-                    TEQIV[all_TGEN[stmt_cnt - 1]->element[i]]->elem2) == all_TGEN[stmt_cnt - 1]->element.end()){
-                    all_TGEN[stmt_cnt - 1]->element.push_back(TEQIV[all_TGEN[stmt_cnt - 1]->element[i]]->elem2);
-                }
+        for (auto it = TEQIV.begin(); it != TEQIV.end(); ++it){
+            std::string first = it->first;
+            std::string second = it->second->elem2;
+            auto begin = all_TGEN[stmt_cnt - 1]->element.begin();
+            auto end = all_TGEN[stmt_cnt - 1]->element.end();
+            //find first not find second
+            if((std::find(begin, end, first) != end) && (std::find(begin, end, second) == end)){
+                all_TGEN[stmt_cnt - 1]->element.push_back(second);
             }
-            
         }
     }
 }
@@ -195,15 +195,18 @@ void handling_TDEF(int stmt_cnt){
 }
 void update_TREF(int stmt_cnt){
     if(!all_TREF[stmt_cnt - 1]->element.empty()){
-        for(int i = 0; i < all_TREF[stmt_cnt - 1]->element.size(); i ++){
-            if(TEQIV.find(all_TREF[stmt_cnt - 1]->element[i]) != TEQIV.end()){
-                if(std::find(all_TREF[stmt_cnt - 1]->element.begin(), \
-                    all_TREF[stmt_cnt - 1]->element.end(), \
-                    TEQIV[all_TREF[stmt_cnt - 1]->element[i]]->elem2) == all_TREF[stmt_cnt - 1]->element.end()){
-                    all_TREF[stmt_cnt - 1]->element.push_back(TEQIV[all_TREF[stmt_cnt - 1]->element[i]]->elem2);
-                }
+        for (auto it = TEQIV.begin(); it != TEQIV.end(); ++it){
+            std::string first = it->first;
+            std::string second = it->second->elem2;
+            auto begin = all_TREF[stmt_cnt - 1]->element.begin();
+            auto end = all_TREF[stmt_cnt - 1]->element.end();
+            //find first not find second
+            if((std::find(begin, end, first) != end) && (std::find(begin, end, second) == end)){
+                all_TREF[stmt_cnt - 1]->element.push_back(second);
             }
-            
+            else if((std::find(begin, end, first) == end) && (std::find(begin, end, second) != end)){
+                all_TREF[stmt_cnt - 1]->element.push_back(first);
+            }
         }
     }
 }
@@ -238,7 +241,27 @@ void handling_TREF(StoreInst* SI, int stmt_cnt){
         RHS_name = std::string(dyn_cast<AllocaInst>(valueToBeStored)->getName());
         if(DEBUG_MODE)errs() << "rhs_name = " << RHS_name << "\n";
     }
+    else if (auto *BI = dyn_cast<BinaryOperator>(valueToBeStored)) {
+        while (isa<BinaryOperator>(BI)) {
+            if (Instruction* op1 = dyn_cast<LoadInst>(BI->getOperand(1))) {
+                std::string op1_name = std::string(op1->getOperand(0)->getName());
+                if (std::find(new_TREF->element.begin(), new_TREF->element.end(), op1_name) == new_TREF->element.end())
+                    new_TREF->element.push_back(op1_name);
+            }
 
+            if (isa<BinaryOperator>(BI->getOperand(0))) {
+                BI = dyn_cast<BinaryOperator>(BI->getOperand(0));
+            } 
+            else {
+                if (Instruction* op0 = dyn_cast<LoadInst>(BI->getOperand(0))) {
+                    std::string op0_name = std::string(op0->getOperand(0)->getName());
+                    if (std::find(new_TREF->element.begin(), new_TREF->element.end(), op0_name) == new_TREF->element.end())
+                        new_TREF->element.push_back(op0_name);
+                }
+                break;
+            }
+        }
+    }
     // LHS, for TREF, TGEN
     TGEN* new_TGEN = new TGEN;
     int level_of_deref = 0;

@@ -1,0 +1,47 @@
+S1:--------------------
+TREF: {}
+TGEN: {p} 
+DEP:{}
+TDEF:{(p, S1)} 
+TEQUIV:{(*p, x)} 
+
+S2:--------------------
+TREF: {}
+TGEN: {pp} 
+DEP:{}
+TDEF:{(p, S1), (pp, S2)} 
+TEQUIV:{(*p, x), (*pp, p), (**pp, x)} 
+
+S3:--------------------
+TREF: {pp} 
+TGEN: {*pp, p} 
+DEP:{
+    pp: S2--->S3
+    p: S1-O->S3
+}
+TDEF:{(p, S3), (pp, S2), (*pp, S3)} 
+TEQUIV:{(*pp, p), (**pp, y), (*p, y)} 
+
+S4:--------------------
+TREF: {p, [*pp]} 
+TGEN: {*p, y} 
+DEP:{
+    p: S3--->S4
+    [*pp: S3--->S4]
+}
+TDEF:{(p, S3), (pp, S2), (*pp, S3), (*p, S4), (y, S4)} 
+TEQUIV:{(*pp, p), (**pp, y), (*p, y)} 
+
+S5:--------------------
+TREF: {*pp, pp, *p, p, y, [**pp]} 
+TGEN: {**pp, y} 
+DEP:{
+    *pp: S3--->S5
+    pp: S2--->S5
+    *p: S4--->S5 
+    p: S3--->S5
+    y: S4--->S5
+    y: S4-O->S5
+}
+TDEF:{(p, S3), (pp, S2), (*pp, S3), (*p, S4), (y, S5), (**pp, S5)} 
+TEQUIV:{(*pp, p), (**pp, y), (*p, y)}

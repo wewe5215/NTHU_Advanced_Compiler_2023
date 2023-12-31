@@ -1,0 +1,72 @@
+S1:--------------------
+TREF: {b, c} 
+TGEN: {a} 
+DEP:{}
+TDEF:{(a, S1)} 
+TEQUIV:{}
+
+S2:--------------------
+TREF: {}
+TGEN: {p} 
+DEP:{}
+TDEF:{(a, S1), (p, S2)} 
+TEQUIV:{(*p, y)} 
+
+S3:--------------------
+TREF: {b, c} 
+TGEN: {d} 
+DEP:{}
+TDEF:{(a, S1), (p, S2), (d, S3)} 
+TEQUIV:{(*p, y)} 
+
+S4:--------------------
+TREF: {a, d, x, y, *p} 
+TGEN: {f} 
+DEP:{
+    a: S1--->S4
+    d: S3--->S4
+}
+TDEF:{(a, S1), (p, S2), (d, S3), (f, S4)} 
+TEQUIV:{(*p, y)} 
+
+S5:--------------------
+TREF: {a, d, x, y, *p} 
+TGEN: {g} 
+DEP:{
+    a: S1--->S5
+    d: S3--->S5
+}
+TDEF:{(a, S1), (p, S2), (d, S3), (f, S4), (g, S5)} 
+TEQUIV:{(*p, y)} 
+
+S6:--------------------
+TREF: {p, i} 
+TGEN: {*p, y} 
+DEP:{
+    p: S2--->S6
+}
+TDEF:{(a, S1), (p, S2), (d, S3), (f, S4), (g, S5), (*p, S6), (y, S6)} 
+TEQUIV:{(*p, y)} 
+
+S7:--------------------
+TREF: {a, d, x, y, *p} 
+TGEN: {h} 
+DEP:{
+    a: S1--->S7
+    d: S3--->S7
+    y: S6--->S7
+    *p: S6--->S7
+}
+TDEF:{(a, S1), (p, S2), (d, S3), (f, S4), (g, S5), (*p, S6), (y, S6), (h, S7)} 
+TEQUIV:{(*p, y)} 
+
+S8:--------------------
+TREF: {y, *p} 
+TGEN: {f} 
+DEP:{
+    y: S6--->S8
+    *p: S6--->S8
+    f: S4-O->S8
+}
+TDEF:{(a, S1), (p, S2), (d, S3), (f, S8), (g, S5), (*p, S6), (y, S6), (h, S7)} 
+TEQUIV:{(*p, y)}
