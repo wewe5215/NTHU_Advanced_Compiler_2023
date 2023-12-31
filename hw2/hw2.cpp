@@ -228,6 +228,16 @@ void handling_TREF(StoreInst* SI, int stmt_cnt){
             LI1 = dyn_cast<Instruction>(LI1->getOperand(0));
             level_of_deref++;
         }
+        if(all_variables[RHS_name]->level_of_pointer == 2){
+            if(level_of_deref == 2)
+                new_TREF->element.push_back(RHS_name);
+            else if(level_of_deref == 1)
+                new_TREF->element.push_back("*" + RHS_name);
+        }
+        else if(all_variables[RHS_name]->level_of_pointer == 1){
+            if(level_of_deref == 1)
+                new_TREF->element.push_back(RHS_name);
+        }
         std::string ref_name = "";
         while (level_of_deref--)
         {

@@ -33,14 +33,14 @@ TDEF:{(*p, S4), (*pp, S3), (p, S3), (pp, S2), (y, S4)}
 TEQUIV:{(**pp, y), (*p, y), (*pp, p)}
 
 S5:--------------------
-TREF: {*p, *pp, pp, y, p}
+TREF: {p, *p, *pp, pp, y}
 TGEN: {**pp, y}
 DEP:{
+    p: S3--->S5
     *p: S4--->S5
     *pp: S3--->S5
     pp: S2--->S5
     y: S4--->S5
-    p: S3--->S5
     y: S4-O->S5
 }
 TDEF:{(**pp, S5), (*p, S4), (*pp, S3), (p, S3), (pp, S2), (y, S5)}
