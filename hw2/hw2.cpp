@@ -55,11 +55,9 @@ void handling_var(AllocaInst* AI) {
     Type *type = AI->getAllocatedType();
     if (type->isPointerTy()) {
         new_var->is_pointer = 1;
-        if(var_name == "p"){
-            new_var->level_of_pointer = 1;
-            new_var->name = "*p";
-        }
-        else if(var_name == "pp"){
+        new_var->level_of_pointer = 1;
+        new_var->name = "*" + var_name;
+        if(var_name == "pp"){
             new_var->level_of_pointer = 2;
             new_var->name = "**pp";
         }
@@ -78,6 +76,63 @@ void handling_var(AllocaInst* AI) {
     return;
 }
 
+void update_level_of_pointer(StoreInst* SI){
+    std::string RHS_name, LHS_name;
+    Value *valueToBeStored = SI->getOperand(0);
+    Value *storeLocation = SI->getOperand(1);
+    int RHS_var = 0;
+    if(isa<LoadInst>(valueToBeStored)){
+        Instruction* LI1 = dyn_cast<Instruction>(valueToBeStored);
+        int level_of_deref = 0;
+        while(isa<LoadInst>(LI1)){
+            if(isa<AllocaInst>(LI1->getOperand(0))){
+                RHS_name = std::string(LI1->getOperand(0)->getName());
+                if(DEBUG_MODE)errs() << "rhs_name = " << RHS_name << "\n";
+                break;
+            }
+            LI1 = dyn_cast<Instruction>(LI1->getOperand(0));
+            level_of_deref++;
+        }
+        RHS_var = 1;
+    }
+    else if(isa<AllocaInst>(valueToBeStored)){
+        RHS_name = std::string(dyn_cast<AllocaInst>(valueToBeStored)->getName());
+        if(DEBUG_MODE)errs() << "rhs_name = " << RHS_name << "\n";
+        RHS_var = 1;
+    }
+
+    int level_of_deref = 0;
+    if(isa<LoadInst>(storeLocation)){
+        level_of_deref++;
+        Instruction* LI1 = dyn_cast<Instruction>(storeLocation);
+        while(isa<LoadInst>(LI1)){
+            if(isa<AllocaInst>(LI1->getOperand(0))){
+                LHS_name = std::string(LI1->getOperand(0)->getName());
+                if(DEBUG_MODE)errs() << "lhs_name = " << LHS_name << ", with multiple load\n";
+                break;
+            }
+            LI1 = dyn_cast<Instruction>(LI1->getOperand(0));
+            level_of_deref++;
+        }
+        if(DEBUG_MODE)errs() << "level_of_deref = " << level_of_deref << "\n";
+        if(RHS_var){
+            if(level_of_deref == 1 && all_variables[RHS_name]->is_pointer == 1){
+                all_variables[LHS_name]->level_of_pointer = 2;
+                all_variables[LHS_name]->name = "**" + LHS_name;
+            }
+            else if(level_of_deref == 2){
+                all_variables[LHS_name]->level_of_pointer = 2;
+                all_variables[LHS_name]->name = "**" + LHS_name;
+            }
+        }
+        else {
+            if(level_of_deref == 1){
+                all_variables[LHS_name]->level_of_pointer = 1;
+            }
+        }
+    }
+    
+}
 void handling_alias(std::string src){
     std::string elem2_str = "*" + TEQIV[src]->elem2;
     if(all_variables[TEQIV[src]->elem2]->is_pointer && (all_variables[TEQIV[src]->elem1_name]->level_of_pointer == 2)){
@@ -392,6 +447,11 @@ PreservedAnalyses HW2Pass::run(Function &F, FunctionAnalysisManager &FAM) {
                 handling_var(AI);
             }
             else if(auto *SI = dyn_cast<StoreInst>(&I)){
+                update_level_of_pointer(SI);
+            }
+        }
+        for (Instruction &I : BB) {
+            if(auto *SI = dyn_cast<StoreInst>(&I)){
                 stmt_cnt++;
                 handling_TREF(SI, stmt_cnt);
                 handling_TGEN(stmt_cnt);
